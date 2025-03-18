@@ -2,12 +2,12 @@
 	"name": "sp_CreateSQLServerlessView_gold",
 	"properties": {
 		"content": {
-			"query": "USE gold_db\nGO\n\nCREATE OR ALTER PROC CreateSQLServerlessView_gold @ViewName NVARCHAR(100)\nAS\nBEGIN\n\nDECLARE @statement VARCHAR(MAX)\n\n    SET @statement = N'CREATE OR ALTER VIEW ' + @ViewName +  ' AS\n        SELECT * \n        FROM\n            OPENRAWSET(\n                BULK ''https://realtimedatalakegen2.dfs.core.windows.net/gold/SalesLT/' + @ViewName + '/'',\n                FORMAT = ''DELTA''\n            ) as [result]\n    '\n\nEXEC (@statement)\n\nEND\nGO",
+			"query": "USE gold_db;\nGO\n\nCREATE OR ALTER PROC CreateSQLServerlessView_gold @ViewName NVARCHAR(100)\nAS\nBEGIN\n    DECLARE @statement NVARCHAR(MAX);\n\n    -- Construct the dynamic SQL statement\n    SET @statement = N'\n    CREATE OR ALTER VIEW ' + QUOTENAME(@ViewName) + N' AS\n    SELECT *\n    FROM\n        OPENROWSET(\n            BULK ''' + 'https://realtimedatalakegen2.dfs.core.windows.net/gold/SalesLT/' + @ViewName + '/' + ''',\n            FORMAT = ''DELTA''\n        ) AS [result]\n    ';\n\n    -- Print the dynamic SQL for debugging\n    PRINT @statement;\n\n    -- Execute the dynamic SQL\n    BEGIN TRY\n        EXEC sp_executesql @statement;\n    END TRY\n    BEGIN CATCH\n        -- Handle errors\n        DECLARE @ErrorMessage NVARCHAR(4000);\n        DECLARE @ErrorSeverity INT;\n        DECLARE @ErrorState INT;\n\n        SELECT\n            @ErrorMessage = ERROR_MESSAGE(),\n            @ErrorSeverity = ERROR_SEVERITY(),\n            @ErrorState = ERROR_STATE();\n\n        RAISERROR(@ErrorMessage, @ErrorSeverity, @ErrorState);\n    END CATCH;\nEND;\nGO",
 			"metadata": {
 				"language": "sql"
 			},
 			"currentConnection": {
-				"databaseName": "master",
+				"databaseName": "gold_db",
 				"poolName": "Built-in"
 			},
 			"resultLimit": 5000
