@@ -107,12 +107,12 @@
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
 				"content": {
-					"query": "USE gold_db\nGO\n\nCREATE OR ALTER PROC CreateSQLServerlessView_gold @ViewName NVARCHAR(100)\nAS\nBEGIN\n\nDECLARE @statement VARCHAR(MAX)\n\n    SET @statement = N'CREATE OR ALTER VIEW ' + @ViewName +  ' AS\n        SELECT * \n        FROM\n            OPENRAWSET(\n                BULK ''https://realtimedatalakegen2.dfs.core.windows.net/gold/SalesLT/' + @ViewName + '/'',\n                FORMAT = ''DELTA''\n            ) as [result]\n    '\n\nEXEC (@statement)\n\nEND\nGO",
+					"query": "USE gold_db;\nGO\n\nCREATE OR ALTER PROC CreateSQLServerlessView_gold @ViewName NVARCHAR(100)\nAS\nBEGIN\n    DECLARE @statement NVARCHAR(MAX);\n\n    -- Construct the dynamic SQL statement\n    SET @statement = N'\n    CREATE OR ALTER VIEW ' + QUOTENAME(@ViewName) + N' AS\n    SELECT *\n    FROM\n        OPENROWSET(\n            BULK ''' + 'https://realtimedatalakegen2.dfs.core.windows.net/gold/SalesLT/' + @ViewName + '/' + ''',\n            FORMAT = ''DELTA''\n        ) AS [result]\n    ';\n\n    -- Print the dynamic SQL for debugging\n    PRINT @statement;\n\n    -- Execute the dynamic SQL\n    BEGIN TRY\n        EXEC sp_executesql @statement;\n    END TRY\n    BEGIN CATCH\n        -- Handle errors\n        DECLARE @ErrorMessage NVARCHAR(4000);\n        DECLARE @ErrorSeverity INT;\n        DECLARE @ErrorState INT;\n\n        SELECT\n            @ErrorMessage = ERROR_MESSAGE(),\n            @ErrorSeverity = ERROR_SEVERITY(),\n            @ErrorState = ERROR_STATE();\n\n        RAISERROR(@ErrorMessage, @ErrorSeverity, @ErrorState);\n    END CATCH;\nEND;\nGO",
 					"metadata": {
 						"language": "sql"
 					},
 					"currentConnection": {
-						"databaseName": "master",
+						"databaseName": "gold_db",
 						"poolName": "Built-in"
 					},
 					"resultLimit": 5000
@@ -142,6 +142,126 @@
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/create view')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "Get tablenames",
+						"type": "GetMetadata",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "goldtablenames",
+								"type": "DatasetReference",
+								"parameters": {}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobFSReadSettings",
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "BinaryReadSettings"
+							}
+						}
+					},
+					{
+						"name": "For each table name",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get tablenames",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get tablenames').output.childItems",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "Stored procedure1",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[dbo].[CreateSQLServerlessView_gold]",
+										"storedProcedureParameters": {
+											"ViewName": {
+												"value": {
+													"value": "@item().name",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "serverlessSQL_db",
+										"type": "LinkedServiceReference"
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/goldtablenames')]",
+				"[concat(variables('workspaceId'), '/linkedServices/serverlessSQL_db')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/goldtablenames')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "rt-de-asa-WorkspaceDefaultStorage",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Binary",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": "SalesLT",
+						"fileSystem": "gold"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/rt-de-asa-WorkspaceDefaultStorage')]"
 			]
 		}
 	]
