@@ -10,6 +10,12 @@
 		},
 		"rt-de-asa-WorkspaceDefaultStorage_properties_typeProperties_url": {
 			"value": "https://realtimedatalakegen2.dfs.core.windows.net"
+		},
+		"serverlessSQL_db_properties_typeProperties_server": {
+			"value": "rt-de-asa-ondemand.sql.azuresynapse.net"
+		},
+		"serverlessSQL_db_properties_typeProperties_database": {
+			"value": "gold_db"
 		}
 	}
 }

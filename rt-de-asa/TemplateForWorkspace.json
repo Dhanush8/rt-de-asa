@@ -15,6 +15,14 @@
 		"rt-de-asa-WorkspaceDefaultStorage_properties_typeProperties_url": {
 			"type": "string",
 			"defaultValue": "https://realtimedatalakegen2.dfs.core.windows.net"
+		},
+		"serverlessSQL_db_properties_typeProperties_server": {
+			"type": "string",
+			"defaultValue": "rt-de-asa-ondemand.sql.azuresynapse.net"
+		},
+		"serverlessSQL_db_properties_typeProperties_database": {
+			"type": "string",
+			"defaultValue": "gold_db"
 		}
 	},
 	"variables": {
@@ -112,6 +120,29 @@
 				"type": "SqlQuery"
 			},
 			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/serverlessSQL_db')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureSqlDatabase",
+				"typeProperties": {
+					"server": "[parameters('serverlessSQL_db_properties_typeProperties_server')]",
+					"database": "[parameters('serverlessSQL_db_properties_typeProperties_database')]",
+					"encrypt": "mandatory",
+					"trustServerCertificate": false,
+					"authenticationType": "SystemAssignedManagedIdentity"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
 		}
 	]
 }
